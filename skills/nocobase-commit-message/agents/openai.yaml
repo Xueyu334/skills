@@ -1,0 +1,4 @@
+interface:
+  display_name: "NocoBase Commit Message"
+  short_description: "Generate commitlint-compliant NocoBase commits"
+  default_prompt: "Use $nocobase-commit-message to generate one commit message from staged changes or a provided change summary, aligned with commitlint repo hooks and the repository's existing commit style."

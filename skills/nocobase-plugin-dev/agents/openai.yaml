@@ -1,0 +1,4 @@
+interface:
+  display_name: "NocoBase Plugin Dev"
+  short_description: "Implement and debug NocoBase plugins and workflow trigger/node extensions"
+  default_prompt: "Use $nocobase-plugin-dev to implement, refactor, or debug a NocoBase plugin or plugin-workflow trigger/node extension end-to-end. First align with the closest official plugin, then apply lifecycle, collection/resource/ACL, workflow trigger/instruction, client, package.json, and build.config.ts rules, and report validation steps."
