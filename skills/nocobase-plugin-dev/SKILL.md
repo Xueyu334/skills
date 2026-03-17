@@ -81,7 +81,7 @@ rg -n "class .*Plugin|@nocobase/server|@nocobase/client|migrations|resource|acl|
 
 1. 明确本次变更涉及哪些能力：collection model repository resource acl route request workflow trigger instruction i18n logger build。
 2. 涉及 `plugin-workflow` 扩展时，先区分 `trigger` 与 `instruction`；两者都必须同时补 server client 注册，类型标识保持一致；扩展 `instruction` 时再补 `group` 与变量输出策略。
-3. 涉及系统级数据表时，优先在 `src/server/collections` 定义或扩展，并同步准备 `migrations`。
+3. 涉及系统级数据表时，按约定把 Collection 文件放在 `src/server/collections`；新建表使用 `defineCollection()`，扩展已有表使用 `extendCollection()`，并同步准备 `migrations`。
 4. 涉及静态注册时放到 `beforeLoad`，涉及运行时绑定时放到 `load`，不要混用生命周期。
 5. 涉及数据库、资源或权限时，优先复用 `Database`、`DataSourceManager`、`ResourceManager`、`ACL` 现有能力，不要绕开框架自造层。
 6. 涉及工作流触发器服务端实现时，优先把环境订阅放进 `Trigger.on()` / `off()`；在事件回调里调用 `this.workflow.trigger(workflow, context, options)`，需要手动执行或表单校验时再补 `execute()` / `validateContext()`。
@@ -110,6 +110,15 @@ rg -n "class .*Plugin|@nocobase/server|@nocobase/client|migrations|resource|acl|
 - `beforeDisable` / `afterDisable`：处理禁用前检查与禁用后的清理。
 - `handleSyncMessage`：处理多节点同步。
 - 当前仓库的 `Plugin` 基类已提供 `beforeRemove()` / `afterRemove()`，但 `plugin-manager.remove()` 默认并不会自动调用这些钩子；仓库内也仍有大量插件保留 `remove()` 旧写法。涉及卸载清理时，必须先核对当前版本源码，不要默认假设某个 remove hook 一定会触发。
+
+### Collection 与 Resource
+
+- Collection 文件按约定放在 `src/server/collections`；不要把表定义散落到其他目录，除非当前插件已有必须兼容的现有模式。
+- 创建新表使用 `defineCollection()`；扩展已有表使用 `extendCollection()`；不要混用。
+- 定义 Collection 字段时，需为字段补充 `description`；不要省略字段说明，描述内容应准确表达字段含义与用途。
+- 插件首次激活时，系统会自动将 Collection 配置与数据库结构同步。
+- 如果插件已安装并正在运行，后续新增或修改 Collection 后必须手动执行 `yarn nocobase upgrade`，不要假设运行中的插件会自动同步 schema。
+- 定义 Collection 后，系统会自动生成对应的 `Resource`；默认先直接复用该资源，通过 API 执行增删改查，只有在需要自定义动作、权限或路由时再额外扩展资源层。
 
 ### Workflow trigger
 
@@ -146,6 +155,7 @@ rg -n "class .*Plugin|@nocobase/server|@nocobase/client|migrations|resource|acl|
 - 扫描出的依赖需要结合 `references/global-dependencies.md` 判断归属：宿主全局提供且要求与框架保持一致的依赖，优先放入 `peerDependencies`；插件自身需要参与构建、打包或随产物分发的依赖，按规则放入 `devDependencies` 或保持最小化 `dependencies`。
 - 不能只因为某个包在源码里被 `import` 就机械地加入 `dependencies`；必须先判断它是否属于全局依赖、宿主依赖、构建期依赖或插件私有运行时依赖。
 - 依赖管理按整个插件处理，不区分前后端。
+- 只要插件里定义了 Collection，就必须在插件 `package.json` 中声明 `@nocobase/database` 依赖；具体放在 `peerDependencies`、`devDependencies` 或最小化 `dependencies`，仍按 `references/global-dependencies.md` 与同类官方插件模式判断，但不能漏声明。
 - `peerDependencies` 只放宿主运行时必须提供的依赖。
 - 插件自身依赖默认优先放 `devDependencies`；`dependencies` 保持最小化。
 - 使用全局依赖时，版本必须与框架保持一致；完整名单见 `references/global-dependencies.md`。
@@ -189,6 +199,7 @@ yarn build @scope/plugin-name --tar
 涉及 `migration`、`collection`、数据库 schema 或升级链路时，再补：
 
 ```powershell
+# 已安装插件新增或修改 Collection 后需要手动执行
 yarn nocobase upgrade
 ```
 
