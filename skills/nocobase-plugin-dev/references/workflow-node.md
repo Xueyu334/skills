@@ -4,8 +4,10 @@
 
 ## 当前仓库版本差异
 
-- 客户端基类真实 import 路径是 `@nocobase/plugin-workflow/client`，不要照搬旧文档中的 `@nocobase/workflow/client`。
-- 当前节点配置抽屉直接读写 `node.config`；`fieldset` 通常直接以字段键命名，不要默认加 `name: 'digit'` 这类旧写法。
+- **v1 与 v2 客户端差异**：
+  - v2（`src/client-v2`）：插件基类从 `@nocobase/client-v2` 导入，节点基类从 `@nocobase/plugin-workflow/client-v2` 导入；配置抽屉从 Formily Schema `fieldset` 改为 `FieldsetLoader = () => import('./components/...')` 懒加载 React 组件（表单项如 `<Form.Item name={['config', 'digit']} ...>`），并移除 `scope` 与 `components` 属性。
+  - v1（`src/client`）：节点基类从 `@nocobase/plugin-workflow/client` 导入（不要照搬旧文档中的 `@nocobase/workflow/client`）；节点配置抽屉直接读写 `node.config`，`fieldset` 通常直接以字段键命名，不要默认加 `name: 'digit'` 这类旧写法。
+  - `useVariables()` 在 v1 与 v2 中保持一致。
 - 当前仓库内置节点分组至少有 `control` `calculation` `collection` `manual` `extended`；若需要自定义分组，先在 client 插件里 `registerInstructionGroup()`。
 - 文档里的 `JOB_STATUS.RESOVLED` 是旧拼写；当前仓库常量是 `JOB_STATUS.RESOLVED`。
 
@@ -76,16 +78,57 @@ export class AsyncInstruction extends Instruction {
 
 ## 客户端实现
 
-- 继承 `@nocobase/plugin-workflow/client` 的 `Instruction`。
-- 最小提供 `title` `type` `group` `fieldset`；常见可选项包括 `description` `icon` `components` `scope` `useVariables` `useInitializers` `getCreateModelMenuItem` `isAvailable` `testable`。
+- 根据目标版本选择基类：v2（`src/client-v2`）继承 `@nocobase/plugin-workflow/client-v2` 的 `Instruction`，通过 `FieldsetLoader` 懒加载 React 表单组件，已移除 `scope` 与 `components` 注入；v1（`src/client`）继承 `@nocobase/plugin-workflow/client` 的 `Instruction`，使用 `fieldset`。
+- v1 最小提供 `title` `type` `group` `fieldset`；v2 最小提供 `title` `type` `group` `FieldsetLoader`。常见可选项包括 `description` `icon` `useVariables` `useInitializers` `getCreateModelMenuItem` `isAvailable` `testable`（v1 还支持 `components` `scope`）。
 - `type` 应与 `registerInstruction()` 的字符串一致；`group` 优先复用已有分组，只有确有必要时再注册新分组。
-- `fieldset` 面向 `node.config`；一般直接写字段键，不要默认加 `name`。
+- v1 中 `fieldset` 面向 `node.config`，一般直接写字段键，不要默认加 `name`；v2 中 React 组件内一般使用 Ant Design `<Form.Item name={['config', 'xxx']} ...>`。
 - 需要让节点结果供后续节点选择时，实现 `useVariables()`；第一层必须是节点本身，复杂对象再用 `children` 继续展开。
 - 需要在节点配置抽屉里开放测试运行按钮时，设置 `testable = true`，并确保服务端已有 `test(config)`。
 - 需要限制节点使用位置时，再实现 `isAvailable()`；例如禁用同步工作流、限制某些上游节点或分支内不可见。
 - 需要在 2.0 Flow 模型中直接创建结果卡片或值块时，再实现 `useInitializers()` / `getCreateModelMenuItem()`。
 
-最小骨架：
+### v2（`src/client-v2`）最小骨架
+
+```tsx
+import WorkflowPluginClient, { Instruction } from '@nocobase/plugin-workflow/client-v2';
+
+export class RandomStringInstruction extends Instruction {
+  title = 'Random number string';
+  type = 'random-string';
+  group = 'extended';
+  FieldsetLoader = () => import('./components/RandomStringConfig');
+
+  useVariables({ key, title }) {
+    return {
+      value: key,
+      label: title,
+    };
+  }
+}
+
+// components/RandomStringConfig.tsx
+import { Form, InputNumber } from 'antd';
+
+export default function RandomStringConfig() {
+  return (
+    <Form.Item
+      name={['config', 'digit']}
+      label="Digit"
+      initialValue={6}
+      rules={[{ required: true }]}
+    >
+      <InputNumber min={1} max={10} />
+    </Form.Item>
+  );
+}
+
+async load() {
+  const workflow = this.app.pm.get('workflow') as WorkflowPluginClient;
+  workflow.registerInstruction('random-string', RandomStringInstruction);
+}
+```
+
+### v1（`src/client`）最小骨架
 
 ```tsx
 import WorkflowPluginClient, { Instruction } from '@nocobase/plugin-workflow/client';
@@ -168,6 +211,8 @@ useVariables({ key, title }, { fieldNames = defaultFieldNames } = {}) {
 - `templates/workflow-node/client/client-plugin-register.template.tsx`：客户端注册节点与可选分组。
 
 这些模板已吸收 `plugin-workflow`、`plugin-workflow-javascript`、`plugin-workflow-request`、`plugin-workflow-delay`、`plugin-workflow-variable` 与 `@yh-project/plugin-k3cloud` 的共性实现，优先把它们当起点，不要从空文件手写。
+
+> 说明：当前 `templates/workflow-node/client/` 模板面向 v1 `fieldset` 体系（`@nocobase/plugin-workflow/client`）；若是 v2（`src/client-v2`）插件，可继续复用 `templates/workflow-node/server/` 模板，客户端侧参考上方 v2 骨架改为 `@nocobase/plugin-workflow/client-v2` + `FieldsetLoader`。
 
 ## 样例优先级
 

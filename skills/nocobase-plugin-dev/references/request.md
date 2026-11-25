@@ -47,6 +47,7 @@ await ctx.api.request({
 示例：
 
 ```ts
+const { axios } = ctx.api;
 axios.defaults.headers.common['Authorization'] = AUTH_TOKEN;
 axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded';
 ```
@@ -60,6 +61,8 @@ axios.defaults.headers.post['Content-Type'] = 'application/x-www-form-urlencoded
 - 多应用 多语言 多角色 场景透传
 
 ```ts
+const { axios } = ctx.api;
+
 axios.interceptors.request.use((config) => {
   config.paramsSerializer = (params) =>
     qs.stringify(params, {
@@ -84,6 +87,8 @@ axios.interceptors.request.use((config) => {
 响应拦截器常用于统一错误提示：
 
 ```ts
+const { axios } = ctx.api;
+
 axios.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -110,17 +115,18 @@ axios.interceptors.response.use(
 
 ## 在组件中使用
 
-在 React 组件中可通过 `useFlowContext()` 获取上下文：
+在 React 组件中从 `@nocobase/flow-engine` 导入 `useFlowContext()` 获取上下文（v1 旧代码可能从 `@nocobase/client` 导入）：
 
 ```tsx
-import { useFlowContext } from '@nocobase/client';
+import { useEffect } from 'react';
+import { useFlowContext } from '@nocobase/flow-engine';
 
 const MyComponent = () => {
   const ctx = useFlowContext();
 
   const fetchData = async () => {
     const response = await ctx.api.request({
-      url: '/api/posts',
+      url: 'posts:list',
       method: 'get',
     });
     console.log(response.data);
@@ -139,7 +145,7 @@ const MyComponent = () => {
 组件内请求通常可配合 `ahooks` 的 `useRequest`：
 
 ```tsx
-import { useFlowContext } from '@nocobase/client';
+import { useFlowContext } from '@nocobase/flow-engine';
 import { useRequest } from 'ahooks';
 
 const MyComponent = () => {

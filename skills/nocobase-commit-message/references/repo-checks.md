@@ -14,10 +14,13 @@ module.exports = { extends: ['@commitlint/config-conventional'] };
 
 结论：
 
-- 提交标题必须符合 Conventional Commits。
+- 提交标题必须符合 Conventional Commits，并遵守 `@commitlint/config-conventional` 内置规则：
+  - `header-max-length`、`body-max-line-length`、`footer-max-line-length` 均为 100 字符。
+  - `subject-case` 禁用 `sentence-case`、`start-case`、`pascal-case`、`upper-case`（英文 `subject` 首字母须小写）。
+  - `subject-full-stop` 禁止以 `.` 结尾；`body-leading-blank`、`footer-leading-blank` 要求保留前置空行。
 - `type(scope): subject` 与 `type: subject` 都可用。
-- 当前仓库没有自定义 `scope` 枚举 `subject` 语言 或 “必须带 body” 的 commitlint 规则。
-- 不要因为仓库里存在 `release` 相关脚本或提交 就误判单词 `release` 本身非法；真正非法的是把 `release` 当成 `type`。
+- 当前仓库没有自定义 `scope` 枚举、`subject` 语言或“必须带 body”的 commitlint 规则。
+- 不要因为仓库里存在 `release` 相关脚本或提交就误判单词 `release` 本身非法；真正非法的是把 `release` 当成 `type`。
 
 ## hooks
 
@@ -33,6 +36,7 @@ module.exports = { extends: ['@commitlint/config-conventional'] };
 结论：
 
 - 生成提交信息时必须以 `commit-msg` 可通过为前提。
+- 依据 NocoBase 最新 `AGENTS.md`，提交前应对改动文件运行 `yarn eslint --fix`，解决类型错误和 lint 警告而非禁用规则；并遵循按影响范围加前缀的习惯（如 `fix(plugin-workflow): ...`、`feat(client): ...`、`chore: ...`、`docs: ...`）。
 - 变更说明可适度体现 pre-commit 质量修复动作。
 
 ## lint-staged

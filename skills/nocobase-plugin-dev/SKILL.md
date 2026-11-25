@@ -95,9 +95,10 @@ rg -n "class .*Plugin|@nocobase/server|@nocobase/client|migrations|resource|acl|
 
 ### 目录与入口
 
-- 典型 fullstack 目录包含 `src/index.ts`、`src/server`、`src/client`、`src/locale`。
-- `client.js`、`server.js`、`client.d.ts`、`server.d.ts` 要与构建产物一致。
-- `src/index.ts` 只导出插件主入口；若插件 `add` 或 `enable` 失败，优先检查是否误导出了 client 内容。常见模式见 `references/troubleshooting.md`。
+- `yarn pm create` 生成的 v2 脚手架通常同时包含 `src/client-v2/`（v2 前端，基于 `@nocobase/client-v2` 与 `@nocobase/flow-engine`）、`src/client/`（v1 兼容）、`src/server/`、`src/locale/`，以及根入口 `client-v2.js`、`client-v2.d.ts`、`client.js`、`client.d.ts`、`server.js`、`server.d.ts` 与 `src/index.ts`。
+- 开发前先确认目标仓库或插件使用 `src/client-v2` 还是兼容 `src/client`，不要混用 `@nocobase/client-v2` 与 `@nocobase/client` 的扩展写法。
+- `client-v2.js`、`client.js`、`server.js` 及其 `.d.ts` 要与构建产物一致。
+- `src/index.ts` 只导出插件主入口（即服务端入口）；若插件 `add` 或 `enable` 失败，优先检查是否误导出了 client 内容。常见模式见 `references/troubleshooting.md`。
 
 ### 生命周期
 
@@ -122,13 +123,15 @@ rg -n "class .*Plugin|@nocobase/server|@nocobase/client|migrations|resource|acl|
 
 ### Workflow trigger
 
-- 扩展触发器类型时，服务端继承 `@nocobase/plugin-workflow` 的 `Trigger`，客户端继承 `@nocobase/plugin-workflow/client` 的 `Trigger`。不要照搬旧文档里的 `@nocobase/workflow/client`，先以当前仓库源码为准。
+- 扩展触发器类型时，服务端继承 `@nocobase/plugin-workflow` 的 `Trigger`；客户端按目标前端版本区分：v2（`src/client-v2`）继承 `@nocobase/plugin-workflow/client-v2` 的 `Trigger`，v1（`src/client`）继承 `@nocobase/plugin-workflow/client` 的 `Trigger`。不要照搬旧文档里的 `@nocobase/workflow/client`，先以当前仓库源码为准。
 - 触发器类型标识必须全局唯一，且 server client `registerTrigger()` 使用同一字符串。
 - 服务端默认在 `on()` 中订阅环境事件，在回调中调用 `this.workflow.trigger(workflow, context, options)`；在 `off()` 中对称取消订阅并清理 listener timer map。
 - 一个触发器实例会同时服务多个 workflow；定时器、listener、hook id 默认按 `workflow.id` 建 `Map`，不要只存单个字段后被后续 workflow 覆盖。
 - 当前仓库在工作流配置更新时会先对旧配置执行 `off()`；取消订阅逻辑不要依赖 Sequelize Model 实例方法，只依赖 `id` `type` `config` 这类可序列化字段。
-- 客户端最小配置是 `title` 与 `fieldset`；复杂触发器再补 `description` `sync` `triggerFieldset` `useVariables` `components` `scope` `useInitializers`。
-- 当前仓库的 trigger 配置表单直接读写 `workflow.config`；不要机械照搬旧文档里的 `name: 'config.xxx'`，先参考同版本官方插件的 `fieldset` 写法。
+- 客户端配置方式按版本区分：
+  - v2（`src/client-v2`）：最小配置是 `title` 与 `FieldsetLoader`（如 `FieldsetLoader = () => import('./components/...')` 懒加载 React 表单组件），已移除 `scope` 与 `components` 注入；
+  - v1（`src/client`）：最小配置是 `title` 与 `fieldset`（Formily Schema）；复杂触发器再补 `description` `sync` `triggerFieldset` `useVariables` `components` `scope` `useInitializers`。
+- v1 配置表单直接读写 `workflow.config`；不要机械照搬旧文档里的 `name: 'config.xxx'`，先参考同版本官方插件的 `fieldset` 写法。
 - 注册时机默认放插件 `load()`；插件实例获取方式跟随邻近官方插件，可用 `this.app.pm.get('workflow')` 或 `this.app.pm.get(WorkflowPlugin)`。
 - 若环境事件天然是全局 middleware hook，且已能通过 `enabledCache` 过滤启用工作流，可参考 `plugin-workflow-request-interceptor` 在构造器中一次性挂载；否则坚持 per-workflow `on` / `off`。
 
@@ -139,8 +142,10 @@ rg -n "class .*Plugin|@nocobase/server|@nocobase/client|migrations|resource|acl|
 - 需要把结果暴露给后续节点时，把数据放进返回值的 `result`；配置中包含变量模板时，优先用 `processor.getParsedValue(node.config, node.id)` 或同等方式先解析。
 - 外部异步回调场景返回 `JOB_STATUS.PENDING` 时，必须补 `resume()`；若 client 侧需要抽屉里的测试运行按钮，再补 `test()` 并配合 `testable = true`。
 - 只有分支调度或流程控制类节点才考虑返回 `null` 提前退出；这类实现优先对照 `plugin-workflow-parallel` 等官方样例，并补充分支与恢复测试。
-- 客户端继承 `@nocobase/plugin-workflow/client` 的 `Instruction`；最小配置是 `title` `type` `group` `fieldset`，常见可选项包括 `description` `icon` `components` `scope` `useVariables` `useInitializers` `getCreateModelMenuItem` `isAvailable` `testable`。
-- 当前仓库节点配置抽屉直接读写 `node.config`；不要机械照搬旧文档里的 `name: 'digit'` 之类写法，先参考同版本官方节点的 `fieldset`。
+- 客户端按目标前端版本区分：
+  - v2（`src/client-v2`）：继承 `@nocobase/plugin-workflow/client-v2` 的 `Instruction`，配置界面通过 `FieldsetLoader` 懒加载 Ant Design React 表单组件（表单项通常使用 `name={['config', 'xxx']}`），已移除 `scope` 与 `components` 注入，`useVariables()` 保持一致；
+  - v1（`src/client`）：继承 `@nocobase/plugin-workflow/client` 的 `Instruction`，最小配置是 `title` `type` `group` `fieldset`，常见可选项包括 `description` `icon` `components` `scope` `useVariables` `useInitializers` `getCreateModelMenuItem` `isAvailable` `testable`。
+- v1 节点配置抽屉直接读写 `node.config`；不要机械照搬旧文档里的 `name: 'digit'` 之类写法，先参考同版本官方节点的 `fieldset`。
 - 节点结果要作为变量供下游使用时，`useVariables()` 第一层必须以当前节点自身为根：`value = node.key`、`label = node.title`；复杂对象再用 `children` 继续展开，数组路径不要写索引。
 - 若节点需要放进新的分组，先在 client 插件里 `registerInstructionGroup()`，再 `registerInstruction()`；若已有 `control` `calculation` `collection` `manual` `extended` 或邻近插件自定义分组可复用，就不要重复造组。
 - 限制节点可用范围时，再实现 `isAvailable()`；最常见场景是禁止在同步工作流、特定上游节点或某些分支环境中使用。
@@ -152,7 +157,7 @@ rg -n "class .*Plugin|@nocobase/server|@nocobase/client|migrations|resource|acl|
 - 对 `exports`、`nocobase`、`files`、`types` 这类非模板默认字段，默认禁止补充；只有在源码、构建产物、发布流程或运行时加载链路能明确证明必需时，才允许添加。
 - 不能因为“官方某些插件有”或“现有仓库里常见”就补这类字段；必须给出当前插件的直接证据。
 - 构建或整理插件 `package.json` 时，必须先扫描插件源码中实际使用到的外部依赖，不能靠猜测补依赖。
-- 扫描出的依赖需要结合 `references/global-dependencies.md` 判断归属：宿主全局提供且要求与框架保持一致的依赖，优先放入 `peerDependencies`；插件自身需要参与构建、打包或随产物分发的依赖，按规则放入 `devDependencies` 或保持最小化 `dependencies`。
+- 全局依赖由 `@nocobase/server` 和 `@nocobase/client-v2`（v1 为 `@nocobase/client`）提供。扫描出的依赖需要结合 `references/global-dependencies.md` 判断归属：插件依赖统一优先声明在 `devDependencies`，由构建系统自动判断哪些打包进 `dist/node_modules/`、哪些由宿主外部提供；不要将依赖误放入 `dependencies`，否则可能导致重复打包、版本冲突或插件激活失败。
 - 不能只因为某个包在源码里被 `import` 就机械地加入 `dependencies`；必须先判断它是否属于全局依赖、宿主依赖、构建期依赖或插件私有运行时依赖。
 - 依赖管理按整个插件处理，不区分前后端。
 - 只要插件里定义了 Collection，就必须在插件 `package.json` 中声明 `@nocobase/database` 依赖；具体放在 `peerDependencies`、`devDependencies` 或最小化 `dependencies`，仍按 `references/global-dependencies.md` 与同类官方插件模式判断，但不能漏声明。
@@ -160,7 +165,8 @@ rg -n "class .*Plugin|@nocobase/server|@nocobase/client|migrations|resource|acl|
 - 插件自身依赖默认优先放 `devDependencies`；`dependencies` 保持最小化。
 - 使用全局依赖时，版本必须与框架保持一致；完整名单见 `references/global-dependencies.md`。
 - `main` 默认使用 `dist/server/index.js`，除非官方同类插件另有约定。
-- 仅在默认构建无法满足需求时，才在插件根目录添加 `build.config.ts`；模板见 `references/snippets.md`。
+- 仅在默认构建无法满足需求时，才在插件根目录添加 `build.config.ts`（模板见 `references/snippets.md`）：v2 客户端（`src/client-v2`）使用 Rsbuild 的 `modifyRsbuildConfig`，服务端（`src/server`）使用 `modifyTsupConfig`；仅旧版 Vite 仓库使用 `modifyViteConfig`。
+- `.npmignore` 不要使用 `!` 否定语法（如 `*` 配合 `!dist`），否则 `yarn build <plugin> --tar` 会报错 `TypeError: no paths specified to add to archive`；仅直接列出要排除的目录（如 `/node_modules`、`/src`）。
 
 ```powershell
 # 默认使用 PowerShell：先看 NocoBase 运行时依赖
@@ -192,8 +198,15 @@ yarn pm remove @scope/plugin-name
 # 服务端行为或资源动作变更
 yarn test packages/plugins/<scope>/<plugin-name>/src/server
 
-# 需要打包发布或验证构建产物
+# 需要打包发布或验证构建产物（输出到 storage/tar/<package-name>-<version>.tgz）
 yarn build @scope/plugin-name --tar
+
+# 也可以分两步构建与打包
+yarn build @scope/plugin-name
+yarn nocobase tar @scope/plugin-name
+
+# 提交前按仓库规范对改动文件执行 lint 修复
+yarn eslint --fix <touched-files>
 ```
 
 涉及 `migration`、`collection`、数据库 schema 或升级链路时，再补：

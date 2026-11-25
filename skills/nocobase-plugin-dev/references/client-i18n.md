@@ -56,35 +56,75 @@ ctx.t('Hello', { ns: '@my-project/plugin-hello' });
 - model / plugin / engine context 内
 - 需要显式指定 namespace 的调用
 
-### plugin.t()
+### this.t()
 
-插件内部可直接使用：
+在 `Plugin` 类方法（如 `load()` 注册设置页标题）中直接使用 `this.t()`，会自动注入当前插件包名作为 namespace：
 
 ```ts
-this.plugin.t('Hello');
+this.t('Hello');
 ```
 
 适合：
 
 - 当前插件固定命名空间文案
-- 插件类内部的提示和标题
+- 插件类内部的提示和菜单/Tab 标题
+
+### src/client-v2/locale.ts（v2 脚手架 helper）
+
+v2 插件通常在 `src/client-v2/locale.ts` 中定义绑定当前插件命名空间（`[pkg.name, 'client']`）的 `useT()` 与 `tExpr()`：
+
+```ts
+// src/client-v2/locale.ts
+import { tExpr as _tExpr, useFlowEngine } from '@nocobase/flow-engine';
+// @ts-ignore
+import pkg from '../../package.json';
+
+export function useT() {
+  const engine = useFlowEngine();
+  return (str: string, options?: Record<string, any>) =>
+    engine.context.t(str, { ns: [pkg.name, 'client'], ...options });
+}
+
+export function tExpr(key: string) {
+  return _tExpr(key, { ns: [pkg.name, 'client'] });
+}
+```
 
 ### useT()
 
-适合在 React 组件中封装当前插件命名空间的翻译函数：
+适合在 React 组件中直接使用已绑定当前插件命名空间的翻译函数（支持插值参数）：
 
-```ts
-const t = useT();
-return <div>{t('Hello')}</div>;
+```tsx
+import { useT } from '../locale';
+
+export default function MySettingsPage() {
+  const t = useT();
+  return (
+    <div>
+      <h2>{t('Hello')}</h2>
+      <p>{t('Your name is {{name}}', { name: 'NocoBase' })}</p>
+    </div>
+  );
+}
 ```
 
-### tExpr(text)
+### tExpr()
 
-适合需要表达式或 schema 字符串场景时生成翻译表达式：
+适合在模块加载阶段执行的静态定义（如 `FlowModel.define()`、`registerFlow()`），生成延迟翻译表达式（如 `'{{t("My block")}}'`）。务必从插件本地 `../locale` 导入 `tExpr`，不要直接从 `@nocobase/flow-engine` 导入，否则无法匹配插件语言文件命名空间：
 
 ```ts
-const title = tExpr('Hello');
+import { tExpr } from '../locale';
+
+const title = tExpr('My block');
 ```
+
+### `tExpr()`、`useT()` 与 `this.t()` 适用场景对照
+
+| 方法 | 使用位置 | 说明 |
+|------|------|------|
+| `tExpr()` | 静态定义（`define()`、`registerFlow()` 等） | 模块加载时 i18n 尚未初始化，生成延迟翻译表达式 |
+| `useT()` | React 组件内部 | 返回绑定当前插件命名空间的翻译函数 |
+| `this.t()` | `Plugin` 类方法（如 `load()`） | 自动注入当前插件包名作为命名空间 |
 
 ### useTranslation(ns)
 
@@ -106,7 +146,7 @@ export default withTranslation('@my-project/plugin-hello')(MyComponent);
 ## 实践建议
 
 - 用户可见文本统一进入 `src/locale`，不要把中文或英文直接写死在组件里。
-- 当前插件内部的常规文案优先用 `plugin.t()` 或 `useT()`。
-- 需要在 schema 或表达式场景中引用翻译时优先用 `tExpr()`。
+- 严格区分 `this.t()`（Plugin `load()`）、`useT()`（React 组件）和 `tExpr()`（静态定义）的使用边界，混用会导致报错或翻译失效。
+- 在 `FlowModel.define()` 或 `registerFlow()` 中使用 `tExpr()` 时，必须从插件本地 `locale.ts` 导入。
 - 复用 React i18n 生态能力时再用 `useTranslation()` 或 `withTranslation()`。
 - 服务端响应文案和 CLI 场景仍以 `i18n.md` 为准，不要把两端用法混为一谈。

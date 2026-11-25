@@ -47,3 +47,25 @@ export { default } from './server';
 - 检查是否实现 `handleSyncMessage`
 - 检查事件总线消息是否正确发布
 - 检查缓存刷新逻辑
+
+## `yarn build --tar` 报错 `TypeError: no paths specified to add to archive`
+
+- 检查插件根目录 `.npmignore` 是否使用了 `!` 否定语法（例如 `*` 配合 `!dist`、`!package.json`）
+- 打包器会给每行自动加 `!` 转换为 `fast-glob` 排除规则，已有 `!` 会变成无效的 `!!` 导致匹配结果为空
+- 修正为仅列出要排除的目录即可：
+
+```text
+/node_modules
+/src
+```
+
+## 插件激活失败或依赖冲突
+
+- 检查插件 `package.json` 是否误将依赖写入 `dependencies`
+- 应将插件依赖统一移入 `devDependencies`，由构建系统决定打包进 `dist/node_modules/` 或由宿主提供全局依赖
+- 确认全局依赖版本与 `@nocobase/server`、`@nocobase/client-v2`（或 v1 `@nocobase/client`）一致
+
+## 前端国际化不生效或报错
+
+- 检查是否混用了三种翻译方法：`tExpr()`（静态定义 `define()` / `registerFlow()`）、`useT()`（React 组件内）、`this.t()`（Plugin `load()` 内）
+- 检查 `tExpr` 是否从本插件 `src/client-v2/locale.ts`（或 `src/client/locale.ts`）导入，而不是直接从 `@nocobase/flow-engine` 导入（否则缺少当前插件 namespace）

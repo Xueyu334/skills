@@ -4,8 +4,10 @@
 
 ## 当前仓库版本差异
 
-- 客户端基类真实 import 路径是 `@nocobase/plugin-workflow/client`，不要照搬旧文档中的 `@nocobase/workflow/client`。
-- 当前客户端 trigger 配置表单直接读写 `workflow.config`；`fieldset` 通常直接以字段键命名，如 `interval` `collection` `global`，不要默认加 `name: 'config.xxx'`。
+- **v1 与 v2 客户端差异**：
+  - v2（`src/client-v2`）：插件基类从 `@nocobase/client-v2` 导入，触发器基类从 `@nocobase/plugin-workflow/client-v2` 导入；配置界面使用 `FieldsetLoader = () => import('./components/...')` 懒加载 React 表单组件，已移除 `scope` 与 `components` 注入。
+  - v1（`src/client`）：插件基类从 `@nocobase/client` 导入，触发器基类从 `@nocobase/plugin-workflow/client` 导入（不要照搬旧文档中的 `@nocobase/workflow/client`）；配置界面使用 Formily Schema `fieldset`，通常直接以字段键命名（如 `interval` `collection` `global`），不要默认加 `name: 'config.xxx'`。
+  - `useVariables()` 在 v1 与 v2 中保持一致。
 - `registerTrigger()` 的类型字符串才是生效标识；`static TYPE` 可选，但若声明了，也要与注册值保持一致。
 
 ## 服务端实现
@@ -51,13 +53,41 @@ async load() {
 
 ## 客户端实现
 
-- 继承 `@nocobase/plugin-workflow/client` 的 `Trigger`。
-- 最小提供 `title` 与 `fieldset`；复杂触发器再补 `description` `sync` `triggerFieldset` `useVariables` `components` `scope` `useInitializers` `getCreateModelMenuItem()`。
-- `fieldset` 用于保存触发器配置，`triggerFieldset` 用于手动触发或测试输入。
+- 根据目标版本选择基类：v2（`src/client-v2`）继承 `@nocobase/plugin-workflow/client-v2` 的 `Trigger`，使用 `FieldsetLoader` 懒加载 React 配置组件；v1（`src/client`）继承 `@nocobase/plugin-workflow/client` 的 `Trigger`，使用 `fieldset`。
+- v1 最小提供 `title` 与 `fieldset`；复杂触发器再补 `description` `sync` `triggerFieldset` `useVariables` `components` `scope` `useInitializers` `getCreateModelMenuItem()`。
+- v2 最小提供 `title` 与 `FieldsetLoader`，不再需要 `scope` / `components` 注入。
+- `fieldset` / `FieldsetLoader` 用于保存触发器配置，`triggerFieldset` 用于手动触发或测试输入。
 - 需要变量面板、数据块初始化器或临时关联数据源时，优先参考现有官方 trigger 的 `useVariables()` `useInitializers()` `useTempAssociationSource()` 实现。
 - 若触发器天然同步，客户端类也同步设置 `sync = true`，保证 UI 与执行策略一致。
 
-最小骨架：
+### v2（`src/client-v2`）最小骨架
+
+```tsx
+import WorkflowPluginClient, { Trigger } from '@nocobase/plugin-workflow/client-v2';
+
+export class IntervalTrigger extends Trigger {
+  title = 'Interval timer trigger';
+  FieldsetLoader = () => import('./components/IntervalConfig');
+}
+
+// components/IntervalConfig.tsx
+import { Form, InputNumber } from 'antd';
+
+export default function IntervalConfig() {
+  return (
+    <Form.Item name={['config', 'interval']} label="Interval" initialValue={60000}>
+      <InputNumber min={1000} />
+    </Form.Item>
+  );
+}
+
+async load() {
+  const workflow = this.app.pm.get('workflow') as WorkflowPluginClient;
+  workflow.registerTrigger('interval', IntervalTrigger);
+}
+```
+
+### v1（`src/client`）最小骨架
 
 ```tsx
 import WorkflowPluginClient, { Trigger } from '@nocobase/plugin-workflow/client';

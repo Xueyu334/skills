@@ -13,6 +13,28 @@ ctx.logger.debug('当前用户状态', { user });
 ctx.logger.trace('组件渲染完成', { component: 'UserProfile' });
 ```
 
+### 在插件与组件中获取 `logger`
+
+```tsx
+// 1. 在 v2 客户端插件中通过 this.context.logger 调用
+import { Plugin } from '@nocobase/client-v2';
+
+class MyPlugin extends Plugin {
+  async load() {
+    this.context.logger.info('Plugin loaded', { plugin: 'my-plugin' });
+  }
+}
+
+// 2. 在 React 组件中通过 useFlowContext() 调用
+import { useFlowContext } from '@nocobase/flow-engine';
+
+export default function MyPage() {
+  const ctx = useFlowContext();
+  ctx.logger.info('Page loaded', { page: 'UserList' });
+  return null;
+}
+```
+
 常见级别：
 
 | 级别 | 方法 | 说明 |

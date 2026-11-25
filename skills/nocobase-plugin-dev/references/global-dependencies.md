@@ -2,16 +2,16 @@
 
 在 NocoBase 插件开发中，依赖分为两类：
 
-- **全局依赖**：由 `@nocobase/server` 和 `@nocobase/client` 提供，插件中通常无需单独打包。
+- **全局依赖**：由 `@nocobase/server` 和 `@nocobase/client-v2`（v1 为 `@nocobase/client`）提供，插件中通常无需单独打包。
 - **自身依赖**：插件独有的依赖（包括 server 端依赖），会被打包到插件产物中。
 
 这部分属于插件构建规则，按整个插件处理，不区分前后端。
 
 ## 开发原则
 
-由于自身依赖会被打包到插件产物中（包括 server 依赖会被打包到 `dist/node_modules`），因此在插件开发时，可以将所有依赖声明在 `devDependencies` 中，而不是 `dependencies`。这样可以避免在开发环境与生产环境中产生差异。
+由于自身依赖会被打包到插件产物中（包括 server 依赖会被打包到 `dist/node_modules`），NocoBase 构建系统会自动判定哪些包由宿主外部提供、哪些需要打包进 `dist/node_modules/`。因此在插件开发时，应将插件依赖声明在 `devDependencies` 中，避免写入 `dependencies`（否则可能导致重复打包、版本冲突或插件激活失败），同时避免开发环境与生产环境产生差异。
 
-当插件需要安装下列依赖时，请确保版本号与全局依赖中 `@nocobase/server` 和 `@nocobase/client` 保持一致，否则可能导致运行时冲突。
+当插件需要安装下列依赖时，请确保版本号与全局依赖中 `@nocobase/server` 和 `@nocobase/client-v2`（v1 为 `@nocobase/client`）保持一致，否则可能导致运行时冲突。
 
 ## 全局依赖
 
@@ -41,8 +41,10 @@
 - `@nocobase/auth`
 - `@nocobase/cache`
 - `@nocobase/client`
+- `@nocobase/client-v2`
 - `@nocobase/database`
 - `@nocobase/evaluators`
+- `@nocobase/flow-engine`
 - `@nocobase/logger`
 - `@nocobase/resourcer`
 - `@nocobase/sdk`

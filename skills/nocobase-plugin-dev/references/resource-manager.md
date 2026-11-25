@@ -107,12 +107,15 @@ resourceManager.registerActionHandlers({
 resourceManager.define({
   name: 'app',
   actions: {
-    getInfo: async (ctx) => {
+    getInfo: async (ctx, next) => {
       ctx.body = { version: 'v1' };
+      await next();
     },
   },
 });
 ```
+
+> 提示：自定义 action 处理末尾应调用 `await next()`，以保证后续中间件与响应处理正常执行。
 
 常见调用形式：
 

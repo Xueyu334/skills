@@ -1,6 +1,10 @@
 # Router 路由
 
-NocoBase 客户端通过路由管理器扩展前端页面，常用入口是 `router.add()` 和 `pluginSettingsRouter.add()`。
+NocoBase 2.0 客户端通过 `this.router.add()` 注册普通页面路由，通过 `this.pluginSettingsManager`（`addMenuItem()` + `addPageTabItem()`）注册插件设置页。
+
+注意区分两类 `router`：
+- `this.router`（`RouterManager`）：在插件 `load()` 中通过 `.add()` 注册路由。
+- `ctx.router`：在组件或动作中执行路由导航，如 `ctx.router.navigate('/some-page')`（v2 自动解析为 `/v/some-page`）。
 
 ## 默认页面路由
 
@@ -14,103 +18,114 @@ NocoBase 客户端通过路由管理器扩展前端页面，常用入口是 `rou
 
 ## 常规页面扩展
 
-通过 `router.add()` 添加普通页面路由：
+在插件 `load()` 中通过 `this.router.add()` 添加页面路由，推荐使用 `componentLoader` 懒加载：
 
 ```tsx
-import React from 'react';
-import { Link, Outlet } from 'react-router-dom';
-import { Application, Plugin } from '@nocobase/client';
+import { Plugin, Application } from '@nocobase/client-v2';
 
-const Home = () => <h1>Home</h1>;
-const About = () => <h1>About</h1>;
-
-const Layout = () => (
-  <div>
-    <div>
-      <Link to="/">Home</Link> | <Link to="/about">About</Link>
-    </div>
-    <Outlet />
-  </div>
-);
-
-class MyPlugin extends Plugin {
+export class HelloPlugin extends Plugin<any, Application> {
   async load() {
-    this.router.add('root', { element: <Layout /> });
-
-    this.router.add('root.home', { path: '/', element: <Home /> });
-    this.router.add('root.about', { path: '/about', element: <About /> });
+    this.router.add('hello', {
+      path: '/hello',
+      componentLoader: () => import('./pages/HelloPage'),
+    });
   }
 }
-
-const app = new Application({
-  router: { type: 'memory', initialEntries: ['/'] },
-  plugins: [MyPlugin],
-});
-
-export default app.getRootComponent();
 ```
 
-支持动态参数：
+在组件内进行路由跳转：
 
 ```tsx
-this.router.add('root.user', {
-  path: '/user/:id',
-  element: ({ params }) => <div>User ID: {params.id}</div>,
-});
+import { useFlowContext } from '@nocobase/flow-engine';
+
+const MyButton = () => {
+  const ctx = useFlowContext();
+  return <button onClick={() => ctx.router.navigate('/hello')}>Go</button>;
+};
 ```
 
-## 插件设置页扩展
+## 插件设置页扩展（v2 `pluginSettingsManager`）
 
-通过 `pluginSettingsRouter.add()` 添加插件设置页面：
+### 单个设置页
+
+先调用 `addMenuItem()` 注册设置菜单项，再调用 `addPageTabItem()` 注册页面（`key: 'index'` 映射到菜单根路径 `/admin/settings/<menuKey>` 或 `/v/admin/settings/<menuKey>`）。当菜单下只有一个页面时，顶部 Tab 栏会自动隐藏：
 
 ```tsx
-import { Plugin } from '@nocobase/client';
-import React from 'react';
+import { Plugin, Application } from '@nocobase/client-v2';
 
-const HelloSettingPage = () => <div>Hello Setting page</div>;
-
-export class HelloPlugin extends Plugin {
+export class HelloPlugin extends Plugin<any, Application> {
   async load() {
-    this.pluginSettingsRouter.add('hello', {
-      title: 'Hello',
+    this.pluginSettingsManager.addMenuItem({
+      key: 'hello',
+      title: this.t('Hello Settings'),
+      icon: 'ApiOutlined', // Ant Design 图标名
+    });
+
+    this.pluginSettingsManager.addPageTabItem({
+      menuKey: 'hello',
+      key: 'index',
+      title: this.t('Hello Settings'),
+      componentLoader: () => import('./settings/HelloSettingPage'),
+    });
+  }
+}
+```
+
+### 多 Tab 设置页
+
+当同一个设置菜单下注册多个 `addPageTabItem()` 时会自动展示顶部 Tab 栏，可通过 `sort` 调整顺序（值越小越靠前）：
+
+```tsx
+import { Plugin, Application } from '@nocobase/client-v2';
+
+export class PluginSettingsPageClient extends Plugin<any, Application> {
+  async load() {
+    this.pluginSettingsManager.addMenuItem({
+      key: 'external-api',
+      title: this.t('External API Settings'),
       icon: 'ApiOutlined',
-      Component: HelloSettingPage,
+    });
+
+    // Tab 1: key 为 'index'，映射菜单根路径 /admin/settings/external-api
+    this.pluginSettingsManager.addPageTabItem({
+      menuKey: 'external-api',
+      key: 'index',
+      title: this.t('API Configuration'),
+      componentLoader: () => import('./pages/ExternalApiSettingsPage'),
+      sort: -1,
+    });
+
+    // Tab 2: 映射到 /admin/settings/external-api/about
+    this.pluginSettingsManager.addPageTabItem({
+      menuKey: 'external-api',
+      key: 'about',
+      title: this.t('About'),
+      componentLoader: () => import('./pages/AboutPage'),
     });
   }
 }
 ```
 
-## 多级设置路由
+### `addPageTabItem` 常用参数
 
-```tsx
-import { Outlet } from 'react-router-dom';
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `menuKey` | `string` | 是 | 父菜单 `key`，对应 `addMenuItem` 的 `key` |
+| `key` | `string` | 是 | 页面唯一标识；`'index'` 表示默认页，映射到菜单根路径 |
+| `title` | `ReactNode` | 否 | Tab 显示标题（推荐用 `this.t(...)`） |
+| `componentLoader` | `Function` | 否 | 懒加载页面组件（推荐），与 `Component` 二选一 |
+| `Component` | `Component` | 否 | 直接传入 React 组件 |
+| `sort` | `number` | 否 | 排序值，越小越靠前 |
+| `hidden` | `boolean` | 否 | 是否在 Tab 栏隐藏 |
+| `link` | `string` | 否 | 外部链接；设置后点击 Tab 跳转至外部 URL |
 
-const pluginName = 'hello';
+## v1 兼容说明
 
-class HelloPlugin extends Plugin {
-  async load() {
-    this.pluginSettingsRouter.add(pluginName, {
-      title: 'HelloWorld',
-      icon: '',
-      Component: Outlet,
-    });
-
-    this.pluginSettingsRouter.add(`${pluginName}.demo1`, {
-      title: 'Demo1 Page',
-      Component: () => <div>Demo1 Page Content</div>,
-    });
-
-    this.pluginSettingsRouter.add(`${pluginName}.demo2`, {
-      title: 'Demo2 Page',
-      Component: () => <div>Demo2 Page Content</div>,
-    });
-  }
-}
-```
+若维护的是旧版 `src/client`（`@nocobase/client`）插件，设置页仍使用旧 API `this.pluginSettingsRouter.add()`（配合 `Outlet` 承载多级子路由）。
 
 ## 实践建议
 
-- 普通页面扩展优先使用 `router.add()`。
-- 插件配置页优先使用 `pluginSettingsRouter.add()`，保持在后台设置结构中统一出现。
-- 多级设置页面使用父级 `Outlet` 承载子路由。
+- 普通页面扩展优先使用 `this.router.add()` + `componentLoader` 懒加载。
+- 插件配置页优先使用 `this.pluginSettingsManager.addMenuItem()` + `addPageTabItem()`，保持在后台设置结构中统一出现。
 - 路由注册集中放在 client plugin 的 `load()` 中，不要散落到多个入口。
+- 菜单与 Tab 标题在 `load()` 内统一使用 `this.t()` 翻译。
