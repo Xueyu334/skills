@@ -1,19 +1,20 @@
 # skills
 
-面向工程研发的 AI Skill 仓库，当前聚焦 NocoBase 场景，覆盖提交信息生成、插件开发、工作流扩展与研发流程沉淀。
+面向工程研发的 AI Skill 仓库，覆盖 NocoBase 研发链路（提交信息生成、插件开发、工作流扩展）与企业级通用研发规范（中英文业务翻译、全栈命名与领域词库）。
 
 ## 仓库定位
 
-这个仓库的目标不是堆积零散 prompt，而是把可复用的工程经验整理成可执行的 skill。当前内容以 NocoBase 研发链路为核心，强调以下特点：
+这个仓库的目标不是堆积零散 prompt，而是把可复用的工程经验整理成可执行的 skill。内容围绕真实研发链路沉淀，强调以下特点：
 
 - 基于真实仓库结构、真实检查链和真实插件模式工作，而不是凭空发明规则。
 - 将复杂任务拆成 `SKILL.md`、参考资料、模板和 agent 元数据，方便按需加载。
-- 优先解决可直接落地的研发问题，例如 commit message 生成、插件开发、工作流节点扩展和排障。
+- 优先解决可直接落地的研发问题，例如 commit message 生成、插件开发、工作流节点扩展、跨栈命名规范和排障。
 
 ## 当前收录
 
 | Skill | 作用 | 主要内容 |
 | --- | --- | --- |
+| `enterprise-naming` | 企业级中英文业务翻译与全栈联动命名规范 | 统一词根与中英业务翻译，覆盖 DB（MySQL/PG/Oracle/达梦）、Java/TS 及 C#/Go/Python 动态适配、REST/枚举/i18n，并内置金蝶云星空/EAS ERP 术语词库 |
 | `nocobase-commit-message` | 生成符合 NocoBase 仓库检查链的 Conventional Commits 提交信息 | 基于暂存改动或改动摘要生成可直接提交的 commit message，约束 `type`、`scope`、`subject`、`body`，并对齐 `commitlint`、`lint-staged` 等检查链 |
 | `nocobase-plugin-dev` | 设计、开发、重构、调试 NocoBase 插件 | 覆盖 server / client / fullstack 插件、collections、resource、ACL、route、request、i18n、logger、测试、构建，以及 `plugin-workflow` 的 trigger / instruction 扩展 |
 
@@ -23,6 +24,18 @@
 .
 ├─ README.md
 └─ skills
+   ├─ enterprise-naming
+   │  ├─ SKILL.md
+   │  ├─ agents/
+   │  │  └─ openai.yaml
+   │  └─ references/
+   │     ├─ abbreviations-and-guards.md
+   │     ├─ glossary-common.md
+   │     ├─ language-adaptation.md
+   │     ├─ layer-conventions.md
+   │     ├─ semantics-and-verbs.md
+   │     └─ domains/
+   │        └─ kingdee-erp.md
    ├─ nocobase-commit-message
    │  ├─ SKILL.md
    │  ├─ agents/
@@ -58,6 +71,16 @@
 - `agents/openai.yaml`：面向 agent 的展示名称、简短描述和默认提示词配置。
 
 ## 现有 Skill 说明
+
+### `enterprise-naming`
+
+适用于企业级项目中的中英文业务翻译、跨层命名生成与既有代码/DDL 命名审查，按业务语义、编程语言与标识符类型给出命名建议，不绑定具体开发框架，重点消除中式英语与词根漂移。
+
+- 执行模式分流：支持 `Quick`（简单命名免扫仓直接输出，遇影响答案的语言或领域约定时按需查对应参考）、`Contextual`（项目相关命名靶向检索）、`Audit`（批量设计或 DDL/代码审查完整校验）三档模式，降低简单任务的上下文与工具调用开销。
+- 优先级对齐：遵循“用户当次明确指定 > 项目明确约定及业务词典 > 项目已有的稳定命名习惯 > Skill 行业词库与语言规范 > 通用企业英文惯例”，不无条件继承历史遗留错误命名。
+- 默认语言与动态适配：默认覆盖 Java、TypeScript 与 MySQL/PostgreSQL/Oracle/达梦，同时按项目实际编程语言自动切换 C#、Go、Python 等命名惯例，不绑定具体框架。
+- 语义与红线防护：按语义区分 `_id`/`_code`/`_no`/`_count`/`_qty`/`_amount` 等后缀（允许同一业务词根派生形式），结合序列化契约评估 Java 布尔前缀，并按数据库版本/兼容模式评估标识符字节与字符限制。
+- 领域词库内置：提供企业通用词表及金蝶云星空 (K3Cloud) / 金蝶 EAS（财务、供应链、生产制造）专业术语对照。
 
 ### `nocobase-commit-message`
 

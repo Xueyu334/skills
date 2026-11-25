@@ -1,0 +1,4 @@
+interface:
+  display_name: "Enterprise Naming"
+  short_description: "Enterprise bilingual business translation and full-stack naming conventions"
+  default_prompt: "Use $enterprise-naming to translate business terms or generate and review consistent names across code, APIs, and database schemas."
